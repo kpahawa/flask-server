@@ -5,6 +5,7 @@ import os
 import RPi.GPIO as GPIO
 from time import sleep
 
+
 app = Flask(__name__)
 json_obj = None
 list_of_drinks = ['rum', 'coke', 'sprite', 'vodka', 'water']
