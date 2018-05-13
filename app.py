@@ -4,17 +4,36 @@ from json import dumps
 import os
 import RPi.GPIO as GPIO
 from time import sleep
-
+from services.motor_runner import MotorRunner
 
 app = Flask(__name__)
 json_obj = None
 list_of_drinks = ['rum', 'coke', 'sprite', 'vodka', 'water']
-# The script as below using BCM GPIO 00..nn numbers
-GPIO.setmode(GPIO.BCM)
 
-# Set relay pins as output
-GPIO.setup(26, GPIO.OUT)
-print("Using GPIO: {}".format(GPIO.input(26)))
+## All back row with the 5V ones.
+_PIN1 = 21  # pin 29
+_PIN2 = 19  # pin 24
+_PIN3 = 12  # pin 26
+_PIN4 = 13
+
+_PIN_LIST = [_PIN1, _PIN2, _PIN3]
+
+drink_hash = {
+    "rum": _PIN1,
+    "coke": _PIN2,
+    "vodka": _PIN3,
+    "sprite": _PIN4
+}
+
+
+def _setup():
+    GPIO.setmode(GPIO.BCM)
+    # Set relay pins as output
+    GPIO.setup(_PIN1, GPIO.OUT)
+    GPIO.setup(_PIN2, GPIO.OUT)
+    GPIO.setup(_PIN3, GPIO.OUT)
+    #GPIO.setup(_PIN4, GPIO.OUT)
+
 
 @app.route('/test_server', methods=['GET'])
 def test_server():
@@ -34,10 +53,9 @@ def test_server():
 
     return dumps("Ran the server command")
 
-
-
 @app.route('/make_drink', methods=['GET', 'POST'])
 def make_drink():
+    _setup()
     msg_body = request.form['Body']
     print("entered make drink with body {}".format(msg_body))
     drinks_found = []
@@ -48,27 +66,24 @@ def make_drink():
             drinks_found.append(drink)
     resp = MessagingResponse()
     a = ''
+    drinks_to_make = []
     if len(drinks_found) > 0:
-        for drink_idx in range(len(drinks_found)-1):
+        for drink_idx in range(len(drinks_found)):
             drink = drinks_found[drink_idx]
-            a += drink + ' with '
+            drinks_to_make.append(drink_hash.get(drink.lower()))
+
+            if drink_idx != len(drinks_found) - 1:
+                a += drink + ' with '
         a += drinks_found[-1]
 
     if valid_order:
         resp.message("you requested a {}".format(a))
-        print("Entered true")
-        GPIO.output(26, 1)
-        print("set to high")
-        # Sleep for 5 seconds
-        sleep(5)
-        # Turn all relays OFF
-        GPIO.output(26, GPIO.LOW)
-        print("set to low")
-        # Sleep for 5 seconds
-        sleep(5)
+        print("valid order is {}".format(valid_order))
+
+        MotorRunner.run_motor(drinks_to_make)
     else:
         resp.message("Your order is not a valid order")
-
+    GPIO.cleanup()
     return str(resp)
 
 
